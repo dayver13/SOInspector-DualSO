@@ -3,6 +3,17 @@
 #include <string.h>
 #include <mntent.h>
 #include <sys/statvfs.h>
+#include <dirent.h>
+
+static int leer_ull(const char *ruta, unsigned long long *v)
+{
+    FILE *f = fopen(ruta, "r");
+    if (!f)
+        return -1;
+    int ok = fscanf(f, "%llu", v);
+    fclose(f);
+    return ok == 1 ? 0 : -1;
+}
 
 int main(void)
 {
@@ -19,6 +30,7 @@ int main(void)
 
     // Obtener el tamaño de página del sistema
     page_size = getpagesize();
+    printf("MEMORIA DEL SISTEMA\n");
     printf("Tamaño de página: %lu bytes\n", page_size);
 
     // Abrir el archivo /proc/meminfo para leer la información de memoria
@@ -49,6 +61,7 @@ int main(void)
         printf("Swap total: %.2f MB\n", swap_total_kb / 1024.0);
         printf("Swap libre: %.2f MB\n", swap_free_kb / 1024.0);
         printf("Swap en uso: %.2f MB\n", (swap_total_kb - swap_free_kb) / 1024.0);
+        printf("\n");
     }
 
     // Abrir el archivo /proc/vmstat para leer la información de fallos de página
@@ -132,11 +145,81 @@ int main(void)
 
         double MB = 1024.0 * 1024.0;
         double total = (double)sv.f_blocks * sv.f_frsize / MB;
-
+        printf("\nINFORMACIÓN DEL VOLUMEN PRINCIPAL\n");
         printf("Dispositivo principal: %s\n", dev);
         printf("Punto de montaje: %s\n", mnt);
         printf("Sistema de archivos: %s\n", fs);
         printf("Tamaño del volumen: %.2f MB\n", total);
+        printf("\n");
+    }
+
+    DIR *d = opendir("/sys/block");
+    if (!d)
+    {
+        perror("opendir /sys/block");
+    }
+    else
+    {
+
+        printf("== Dispositivos de bloque ==\n");
+        printf("%-14s %12s  %s\n", "Dispositivo", "Tamaño (MB)", "Tipo");
+
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL)
+        {
+            if (e->d_name[0] == '.')
+                continue;
+            if (strncmp(e->d_name, "loop", 4) == 0 ||
+                strncmp(e->d_name, "ram", 3) == 0)
+                continue;
+
+            char ruta[512];
+            unsigned long long sectores = 0, rot = 2;
+
+            snprintf(ruta, sizeof(ruta), "/sys/block/%s/size", e->d_name);
+            leer_ull(ruta, &sectores);
+
+            snprintf(ruta, sizeof(ruta), "/sys/block/%s/queue/rotational", e->d_name);
+            leer_ull(ruta, &rot);
+
+            const char *tipo = (rot == 1)   ? "HDD (rotacional)"
+                               : (rot == 0) ? "SSD/NVMe/virtual"
+                                            : "desconocido";
+
+            /* los sectores de /sys/block siempre son de 512 bytes */
+            printf("%-14s %12.2f  %s\n", e->d_name,
+                   sectores * 512.0 / (1024.0 * 1024.0), tipo);
+        }
+        closedir(d);
+
+        printf("\n== Contadores de E/S (desde el arranque) ==\n");
+        printf("%-14s %14s %14s\n", "Dispositivo", "Lecturas", "Escrituras");
+    }
+
+    f = fopen("/proc/diskstats", "r");
+    if (!f)
+    {
+        perror("fopen /proc/diskstats");
+    }
+    else
+    {
+
+        char linea[512], nombre[64];
+        unsigned int mayor, menor;
+        unsigned long long lect, lect_m, sect_l, ms_l, escr;
+
+        while (fgets(linea, sizeof(linea), f))
+        {
+            if (sscanf(linea, "%u %u %63s %llu %llu %llu %llu %llu",
+                       &mayor, &menor, nombre, &lect, &lect_m, &sect_l, &ms_l, &escr) == 8)
+            {
+                if (strncmp(nombre, "loop", 4) == 0 ||
+                    strncmp(nombre, "ram", 3) == 0)
+                    continue;
+                printf("%-14s %14llu %14llu\n", nombre, lect, escr);
+            }
+        }
+        fclose(f);
     }
 
     return 0;
