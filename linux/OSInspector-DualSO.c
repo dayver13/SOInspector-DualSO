@@ -4,6 +4,8 @@
 #include <mntent.h>
 #include <sys/statvfs.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <time.h>
 
 static int leer_ull(const char *ruta, unsigned long long *v)
 {
@@ -13,6 +15,13 @@ static int leer_ull(const char *ruta, unsigned long long *v)
     int ok = fscanf(f, "%llu", v);
     fclose(f);
     return ok == 1 ? 0 : -1;
+}
+
+static double ahora(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
 int main(void)
@@ -150,7 +159,6 @@ int main(void)
         printf("Punto de montaje: %s\n", mnt);
         printf("Sistema de archivos: %s\n", fs);
         printf("Tamaño del volumen: %.2f MB\n", total);
-        printf("\n");
     }
 
     DIR *d = opendir("/sys/block");
@@ -192,7 +200,7 @@ int main(void)
         }
         closedir(d);
 
-        printf("\n== Contadores de E/S (desde el arranque) ==\n");
+        printf("== Contadores de E/S (desde el arranque) ==\n");
         printf("%-14s %14s %14s\n", "Dispositivo", "Lecturas", "Escrituras");
     }
 
@@ -220,6 +228,48 @@ int main(void)
             }
         }
         fclose(f);
+        printf("\n");
+    }
+
+    char *buf = calloc(1024 * 1024, 1);
+    if (!buf)
+        return 1;
+
+    double t0 = ahora();
+    f = fopen("prueba.bin", "wb");
+    if (!f)
+    {
+        perror("fopen");
+    }
+    else
+    {
+        for (int i = 0; i < 256; i++)
+            fwrite(buf, 1, 1024 * 1024, f);
+        fflush(f);
+        fsync(fileno(f)); /* forzar a disco */
+        fclose(f);
+        double t_esc = ahora() - t0;
+
+        t0 = ahora();
+        f = fopen("prueba.bin", "rb");
+        if (!f)
+        {
+            perror("fopen");
+        }
+        else
+        {
+            while (fread(buf, 1, 1024 * 1024, f) > 0)
+            {
+            }
+            fclose(f);
+            double t_lec = ahora() - t0;
+
+            printf("Escritura: %.3f s (%.1f MiB/s)\n", t_esc, 256 / t_esc);
+            printf("Lectura:   %.3f s (%.1f MiB/s)\n", t_lec, 256 / t_lec);
+
+            remove("prueba.bin");
+            free(buf);
+        }
     }
 
     return 0;
