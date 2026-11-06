@@ -106,6 +106,7 @@ int main(void)
     }
     else
     {
+        const char *ruta = "/";
 
         struct mntent *m;
         char dev[256] = "desconocido", fs[64] = "desconocido", mnt[256] = "desconocido";
