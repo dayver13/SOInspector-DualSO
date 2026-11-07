@@ -480,14 +480,25 @@ int main(void)
         if (statvfs(ruta, &sv) != 0)
         {
             perror("statvfs");
-            return 1;
         }
+        else
+        {
 
-        printf("\nINFORMACIÓN DE LA UNIDAD\n");
-        printf("Sistema de archivos: %s\n", fs);
-        printf("Tamaño de bloque fundamental (f_frsize): %lu bytes\n", sv.f_frsize);
-        printf("Tamaño de bloque preferido de E/S (f_bsize): %lu bytes\n", sv.f_bsize);
-        printf("Longitud máxima de nombre: %lu\n", sv.f_namemax);
+            double MB = 1024.0 * 1024.0;
+            double capacidad = (double)sv.f_blocks * sv.f_frsize;
+            double libre = (double)sv.f_bavail * sv.f_frsize; /* disponible para usuarios */
+            double usado = ((double)sv.f_blocks - sv.f_bfree) * sv.f_frsize;
+            double pct = (usado + libre) > 0 ? 100.0 * usado / (usado + libre) : 0;
+
+            printf("\nINFORMACIÓN DE LA UNIDAD\n");
+            printf("Sistema de archivos: %s\n", fs);
+            printf("Tamaño de bloque fundamental (f_frsize): %lu bytes\n", sv.f_frsize);
+            printf("Tamaño de bloque preferido de E/S (f_bsize): %lu bytes\n", sv.f_bsize);
+            printf("Longitud máxima de nombre: %lu\n", sv.f_namemax);
+            printf("Capacidad total: %.2f MB\n", capacidad / MB);
+            printf("Espacio usado: %.2f MB (%.1f%%)\n", usado / MB, pct);
+            printf("Espacio libre: %.2f MB\n", libre / MB);
+        }
     }
 
     return 0;
