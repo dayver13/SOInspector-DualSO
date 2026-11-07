@@ -22,6 +22,74 @@ static void mostrar_fecha(const char *etiqueta, FILETIME ft)
            st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 }
 
+static void info(const char *ruta)
+{
+    HANDLE h = CreateFileA(ruta, 0,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+    {
+        fprintf(stderr, "CreateFile fallo: %lu\n", GetLastError());
+        return;
+    }
+
+    BY_HANDLE_FILE_INFORMATION bi;
+    if (!GetFileInformationByHandle(h, &bi))
+    {
+        fprintf(stderr, "GetFileInformationByHandle fallo: %lu\n", GetLastError());
+        CloseHandle(h);
+    }
+    else
+    {
+        CloseHandle(h);
+
+        unsigned long long indice = ((unsigned long long)bi.nFileIndexHigh << 32) | bi.nFileIndexLow;
+        unsigned long long tam = ((unsigned long long)bi.nFileSizeHigh << 32) | bi.nFileSizeLow;
+        DWORD a = bi.dwFileAttributes;
+
+        printf("Archivo: %s\n", ruta);
+        printf("  Tipo: %s\n", (a & FILE_ATTRIBUTE_DIRECTORY) ? "directorio" : "archivo regular");
+        printf("  Tamaño: %llu bytes\n", tam);
+        printf("  Atributos: %s%s%s%s\n",
+               (a & FILE_ATTRIBUTE_READONLY) ? "[solo lectura] " : "",
+               (a & FILE_ATTRIBUTE_HIDDEN) ? "[oculto] " : "",
+               (a & FILE_ATTRIBUTE_SYSTEM) ? "[sistema] " : "",
+               (a & FILE_ATTRIBUTE_ARCHIVE) ? "[archivo] " : "");
+        printf("  Índice de archivo: %llu\n", indice);
+        printf("  Enlaces: %lu\n", bi.nNumberOfLinks);
+        mostrar_fecha("Creación:", bi.ftCreationTime);
+        mostrar_fecha("Último acceso:", bi.ftLastAccessTime);
+        mostrar_fecha("Última modificación:", bi.ftLastWriteTime);
+        printf("\n");
+    }
+}
+
+static void comparar_inodos(const char *a, const char *b)
+{
+    struct stat sa, sb;
+    if (stat(a, &sa) != 0)
+    {
+        perror(a);
+        return;
+    }
+    if (stat(b, &sb) != 0)
+    {
+        perror(b);
+        return;
+    }
+
+    printf("== Comparación de inodos ==\n");
+    printf("  %-22s inodo: %llu  dispositivo: %llu\n", a,
+           (unsigned long long)sa.st_ino, (unsigned long long)sa.st_dev);
+    printf("  %-22s inodo: %llu  dispositivo: %llu\n", b,
+           (unsigned long long)sb.st_ino, (unsigned long long)sb.st_dev);
+
+    if (sa.st_ino == sb.st_ino && sa.st_dev == sb.st_dev)
+        printf("  Resultado: IGUALES, ambos nombres apuntan al mismo archivo\n\n");
+    else
+        printf("  Resultado: DISTINTOS, son archivos diferentes\n\n");
+}
+
 int main(void)
 {
     // Declaración de variables info memoria
@@ -215,10 +283,13 @@ int main(void)
         free(buf);
     }
 
-    const char *ruta = "archivo.txt";
+    const char *original = "archivo.txt";
+    const char *enlace = "archivo_hardlink.txt";
+
+    DeleteFileA(enlace); /* por si quedó de una corrida anterior */
 
     /* Crear el archivo regular */
-    f = fopen(ruta, "w");
+    f = fopen(original, "w");
     if (!f)
     {
         perror("fopen");
@@ -228,32 +299,30 @@ int main(void)
         fputs("Contenido de prueba\n", f);
         fclose(f);
 
-        /* Obtener información */
-        WIN32_FILE_ATTRIBUTE_DATA d;
-        if (!GetFileAttributesExA(ruta, GetFileExInfoStandard, &d))
+        printf("CONSULTAS SISTEMA DE ARCHIVOS\n");
+        printf("== Antes del hard link ==\n");
+        info(original);
+
+        /* Crear el hard link (nuevo nombre, existente) */
+        if (!CreateHardLinkA(enlace, original, NULL))
         {
-            fprintf(stderr, "GetFileAttributesEx fallo: %lu\n", GetLastError());
+            fprintf(stderr, "CreateHardLink fallo: %lu\n", GetLastError());
         }
         else
         {
 
-            ULARGE_INTEGER tam;
-            tam.LowPart = d.nFileSizeLow;
-            tam.HighPart = d.nFileSizeHigh;
+            printf("== Después del hard link ==\n");
+            info(original);
+            info(enlace);
 
-            DWORD a = d.dwFileAttributes;
-            printf("SISTEMA DE ARCHIVOS\n");
-            printf("Archivo: %s\n", ruta);
-            printf("Tipo: %s\n", (a & FILE_ATTRIBUTE_DIRECTORY) ? "directorio" : "archivo regular");
-            printf("Tamaño: %llu bytes\n", tam.QuadPart);
-            printf("Atributos: %s%s%s%s\n",
-                   (a & FILE_ATTRIBUTE_READONLY) ? "[solo lectura] " : "",
-                   (a & FILE_ATTRIBUTE_HIDDEN) ? "[oculto] " : "",
-                   (a & FILE_ATTRIBUTE_SYSTEM) ? "[sistema] " : "",
-                   (a & FILE_ATTRIBUTE_ARCHIVE) ? "[archivo] " : "");
-            mostrar_fecha("Creación:", d.ftCreationTime);
-            mostrar_fecha("Último acceso:", d.ftLastAccessTime);
-            mostrar_fecha("Última modificación:", d.ftLastWriteTime);
+            comparar_inodos(original, enlace);
+
+            /* Borrar el original: el contenido sigue accesible por el enlace */
+            DeleteFileA(original);
+            printf("== Después de borrar el original ==\n");
+            info(enlace);
+
+            DeleteFileA(enlace);
         }
     }
 
