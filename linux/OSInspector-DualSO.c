@@ -320,7 +320,7 @@ int main(void)
     const char *enlace = "archivo_hardlink.txt";
 
     /* Crear el archivo regular */
-    f = fopen(ruta, "w");
+    f = fopen(original, "w");
     if (!f)
     {
         perror("fopen");
