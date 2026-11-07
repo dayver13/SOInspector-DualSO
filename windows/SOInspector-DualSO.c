@@ -64,32 +64,6 @@ static void info(const char *ruta)
     }
 }
 
-static void comparar_inodos(const char *a, const char *b)
-{
-    struct stat sa, sb;
-    if (stat(a, &sa) != 0)
-    {
-        perror(a);
-        return;
-    }
-    if (stat(b, &sb) != 0)
-    {
-        perror(b);
-        return;
-    }
-
-    printf("== Comparación de inodos ==\n");
-    printf("  %-22s inodo: %llu  dispositivo: %llu\n", a,
-           (unsigned long long)sa.st_ino, (unsigned long long)sa.st_dev);
-    printf("  %-22s inodo: %llu  dispositivo: %llu\n", b,
-           (unsigned long long)sb.st_ino, (unsigned long long)sb.st_dev);
-
-    if (sa.st_ino == sb.st_ino && sa.st_dev == sb.st_dev)
-        printf("  Resultado: IGUALES, ambos nombres apuntan al mismo archivo\n\n");
-    else
-        printf("  Resultado: DISTINTOS, son archivos diferentes\n\n");
-}
-
 int main(void)
 {
     // Declaración de variables info memoria
@@ -314,8 +288,6 @@ int main(void)
             printf("== Después del hard link ==\n");
             info(original);
             info(enlace);
-
-            comparar_inodos(original, enlace);
 
             /* Borrar el original: el contenido sigue accesible por el enlace */
             DeleteFileA(original);
