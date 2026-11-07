@@ -111,6 +111,11 @@ static void comparar_inodos(const char *a, const char *b)
 
 int main(void)
 {
+    log_f = fopen(ARCHIVO_REPORTE, "w"); /* usa "a" para ir acumulando corridas */
+    if (!log_f)
+        fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
+                ARCHIVO_REPORTE);
+
     // Declaración de variables info memoria
     unsigned long page_size;
     char line[256];
@@ -518,6 +523,12 @@ int main(void)
             out("Espacio usado: %.2f MB (%.1f%%)\n", usado / MB, pct);
             out("Espacio libre: %.2f MB\n", libre / MB);
         }
+    }
+
+    if (log_f)
+    {
+        fclose(log_f);
+        printf("\nReporte guardado en %s\n", ARCHIVO_REPORTE);
     }
 
     return 0;
