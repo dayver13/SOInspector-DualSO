@@ -6,6 +6,8 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 static int leer_ull(const char *ruta, unsigned long long *v)
 {
@@ -22,6 +24,45 @@ static double ahora(void)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec / 1e9;
+}
+
+static void mostrar_fecha(const char *etiqueta, time_t t)
+{
+    char buf[64];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t));
+    printf("%-22s %s\n", etiqueta, buf);
+}
+
+static void info(const char *ruta)
+{
+    struct stat st;
+    if (stat(ruta, &st) != 0)
+    {
+        perror("stat");
+        return;
+    }
+
+    char p[10];
+    snprintf(p, sizeof(p), "%c%c%c%c%c%c%c%c%c",
+             (st.st_mode & S_IRUSR) ? 'r' : '-',
+             (st.st_mode & S_IWUSR) ? 'w' : '-',
+             (st.st_mode & S_IXUSR) ? 'x' : '-',
+             (st.st_mode & S_IRGRP) ? 'r' : '-',
+             (st.st_mode & S_IWGRP) ? 'w' : '-',
+             (st.st_mode & S_IXGRP) ? 'x' : '-',
+             (st.st_mode & S_IROTH) ? 'r' : '-',
+             (st.st_mode & S_IWOTH) ? 'w' : '-',
+             (st.st_mode & S_IXOTH) ? 'x' : '-');
+
+    printf("\nSISTEMA DE ARCHIVOS\n");
+    printf("Archivo: %s\n", ruta);
+    printf("Tipo: %s\n", S_ISREG(st.st_mode) ? "archivo regular" : "otro");
+    printf("Tamaño: %lld bytes\n", (long long)st.st_size);
+    printf("Permisos: %s (%04o)\n", p, st.st_mode & 07777);
+    mostrar_fecha("Último acceso:", st.st_atime);
+    mostrar_fecha("Última modificación:", st.st_mtime);
+    mostrar_fecha("Último cambio (inodo):", st.st_ctime);
+    printf("\n");
 }
 
 int main(void)
@@ -264,11 +305,52 @@ int main(void)
             fclose(f);
             double t_lec = ahora() - t0;
 
+            printf("== Prueba de velocidad de lectura y escritura ==\n");
             printf("Escritura: %.3f s (%.1f MiB/s)\n", t_esc, 256 / t_esc);
             printf("Lectura:   %.3f s (%.1f MiB/s)\n", t_lec, 256 / t_lec);
+            printf("\n");
 
             remove("prueba.bin");
             free(buf);
+        }
+    }
+
+    // Sistema de archivos
+    const char *original = "archivo.txt";
+    const char *enlace = "archivo_hardlink.txt";
+
+    /* Crear el archivo regular */
+    f = fopen(ruta, "w");
+    if (!f)
+    {
+        perror("fopen");
+    }
+    else
+    {
+        fputs("Contenido de prueba\n", f);
+        fclose(f);
+
+        printf("== Antes del hard link ==\n");
+        info(original);
+
+        /* Crear el hard link */
+        if (link(original, enlace) != 0)
+        {
+            fprintf(stderr, "link fallo: %s\n", strerror(errno));
+        }
+        else
+        {
+
+            printf("== Después del hard link ==\n");
+            info(original);
+            info(enlace);
+
+            /* Borrar el original: el contenido sigue accesible por el enlace */
+            unlink(original);
+            printf("== Después de borrar el original ==\n");
+            info(enlace);
+
+            unlink(enlace);
         }
     }
 

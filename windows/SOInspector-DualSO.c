@@ -12,6 +12,16 @@ static double ahora(void)
     return (double)c.QuadPart / f.QuadPart;
 }
 
+static void mostrar_fecha(const char *etiqueta, FILETIME ft)
+{
+    FILETIME local;
+    SYSTEMTIME st;
+    FileTimeToLocalFileTime(&ft, &local);
+    FileTimeToSystemTime(&local, &st);
+    printf("%-22s %04d-%02d-%02d %02d:%02d:%02d\n", etiqueta,
+           st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+}
+
 int main(void)
 {
     // Declaración de variables info memoria
@@ -194,13 +204,58 @@ int main(void)
                 fclose(f);
                 double t_lec = ahora() - t0;
 
+                printf("== Prueba de velocidad de lectura y escritura ==\n");
                 printf("Escritura: %.3f s (%.1f MiB/s)\n", t_esc, 256 / t_esc);
                 printf("Lectura:   %.3f s (%.1f MiB/s)\n", t_lec, 256 / t_lec);
+                printf("\n");
 
                 remove("prueba.bin");
             }
         }
         free(buf);
     }
+
+    const char *ruta = "archivo.txt";
+
+    /* Crear el archivo regular */
+    f = fopen(ruta, "w");
+    if (!f)
+    {
+        perror("fopen");
+    }
+    else
+    {
+        fputs("Contenido de prueba\n", f);
+        fclose(f);
+
+        /* Obtener información */
+        WIN32_FILE_ATTRIBUTE_DATA d;
+        if (!GetFileAttributesExA(ruta, GetFileExInfoStandard, &d))
+        {
+            fprintf(stderr, "GetFileAttributesEx fallo: %lu\n", GetLastError());
+        }
+        else
+        {
+
+            ULARGE_INTEGER tam;
+            tam.LowPart = d.nFileSizeLow;
+            tam.HighPart = d.nFileSizeHigh;
+
+            DWORD a = d.dwFileAttributes;
+            printf("SISTEMA DE ARCHIVOS\n");
+            printf("Archivo: %s\n", ruta);
+            printf("Tipo: %s\n", (a & FILE_ATTRIBUTE_DIRECTORY) ? "directorio" : "archivo regular");
+            printf("Tamaño: %llu bytes\n", tam.QuadPart);
+            printf("Atributos: %s%s%s%s\n",
+                   (a & FILE_ATTRIBUTE_READONLY) ? "[solo lectura] " : "",
+                   (a & FILE_ATTRIBUTE_HIDDEN) ? "[oculto] " : "",
+                   (a & FILE_ATTRIBUTE_SYSTEM) ? "[sistema] " : "",
+                   (a & FILE_ATTRIBUTE_ARCHIVE) ? "[archivo] " : "");
+            mostrar_fecha("Creación:", d.ftCreationTime);
+            mostrar_fecha("Último acceso:", d.ftLastAccessTime);
+            mostrar_fecha("Última modificación:", d.ftLastWriteTime);
+        }
+    }
+
     return 0;
 }
