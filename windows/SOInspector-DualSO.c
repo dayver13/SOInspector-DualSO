@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <io.h>
 
+#ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
+#define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
+#endif
+
 static double ahora(void)
 {
     LARGE_INTEGER f, c;
@@ -143,23 +147,27 @@ int main(void)
                                    NULL, NULL, fs, sizeof(fs)))
         {
             fprintf(stderr, "GetVolumeInformation fallo: %lu\n", GetLastError());
-            return 1;
         }
-        QueryDosDeviceA(drive, dev, sizeof(dev));
-
-        ULARGE_INTEGER avail, total, freeb;
-        if (!GetDiskFreeSpaceExA(root, &avail, &total, &freeb))
+        else
         {
-            fprintf(stderr, "GetDiskFreeSpaceEx fallo: %lu\n", GetLastError());
-            return 1;
-        }
+            QueryDosDeviceA(drive, dev, sizeof(dev));
 
-        double MB = 1024.0 * 1024.0;
-        printf("INFORMACIÓN DEL VOLUMEN PRINCIPAL\n");
-        printf("Volumen principal: %s (etiqueta: %s)\n", drive, label[0] ? label : "sin etiqueta");
-        printf("Dispositivo: %s\n", dev);
-        printf("Sistema de archivos: %s\n", fs);
-        printf("Tamaño del volumen: %.2f MB\n", total.QuadPart / MB);
+            ULARGE_INTEGER avail, total, freeb;
+            if (!GetDiskFreeSpaceExA(root, &avail, &total, &freeb))
+            {
+                fprintf(stderr, "GetDiskFreeSpaceEx fallo: %lu\n", GetLastError());
+            }
+            else
+            {
+
+                double MB = 1024.0 * 1024.0;
+                printf("INFORMACIÓN DEL VOLUMEN PRINCIPAL\n");
+                printf("Volumen principal: %s (etiqueta: %s)\n", drive, label[0] ? label : "sin etiqueta");
+                printf("Dispositivo: %s\n", dev);
+                printf("Sistema de archivos: %s\n", fs);
+                printf("Tamaño del volumen: %.2f MB\n", total.QuadPart / MB);
+            }
+        }
     }
 
     DWORD mascara = GetLogicalDrives();
@@ -259,8 +267,10 @@ int main(void)
 
     const char *original = "archivo.txt";
     const char *enlace = "archivo_hardlink.txt";
+    const char *simbolico = "archivo_symlink.txt";
 
-    DeleteFileA(enlace); /* por si quedó de una corrida anterior */
+    DeleteFileA(enlace);
+    DeleteFileA(simbolico); /* por si quedó de una corrida anterior */
 
     /* Crear el archivo regular */
     f = fopen(original, "w");
@@ -289,14 +299,154 @@ int main(void)
             info(original);
             info(enlace);
 
-            /* Borrar el original: el contenido sigue accesible por el enlace */
-            DeleteFileA(original);
-            printf("== Después de borrar el original ==\n");
-            info(enlace);
+            f = fopen(enlace, "a");
+            if (!f)
+            {
+                perror("fopen (enlace)");
+            }
+            else
+            {
+                fputs("Linea 2: agregada desde el hard link\n", f);
+                fclose(f);
 
-            DeleteFileA(enlace);
+                printf("== Después de modificar por '%s' ==\n", enlace);
+                mostrar_contenido(original);
+                mostrar_info(original);
+                mostrar_info(enlace);
+                printf("\n");
+
+                f = fopen(original, "a");
+                if (!f)
+                {
+                    perror("fopen (original)");
+                }
+                else
+                {
+                }
+                fputs("Linea 3: agregada desde el original\n", f);
+                fclose(f);
+
+                printf("== Después de modificar por '%s' ==\n", original);
+                mostrar_contenido(enlace);
+
+                DeleteFileA(enlace);
+                DeleteFileA(original);
+            }
         }
     }
+}
+f = fopen(original, "w");
+if (!f)
+{
+    perror("fopen");
+}
+else
+{
+    fputs("Contenido de prueba\n", f);
+    fclose(f);
 
-    return 0;
+    /* Intentar el enlace simbólico (primero sin privilegios, útil con Modo desarrollador) */
+    BOOLEAN ok = CreateSymbolicLinkA(simbolico, original,
+                                     SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE);
+    if (!ok && GetLastError() == ERROR_INVALID_PARAMETER)
+    {
+        /* Windows antiguo que no reconoce el flag: intento clásico */
+        ok = CreateSymbolicLinkA(simbolico, original, 0);
+    }
+
+    if (!ok)
+    {
+        DWORD err = GetLastError();
+        printf("Enlace simbólico: N/D (error %lu%s)\n", err,
+               err == 1314 ? ": falta el privilegio, ejecuta como administrador o activa el Modo desarrollador" : "");
+        DeleteFileA(original);
+    }
+    else
+    {
+
+        DWORD attr = GetFileAttributesA(simbolico);
+        printf("Enlace simbólico: %s -> %s\n", simbolico, original);
+        printf("  Es enlace simbólico (reparse point): %s\n",
+               (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT)) ? "sí" : "no");
+
+        /* Ruta real a la que resuelve el enlace */
+        HANDLE h = CreateFileA(simbolico, GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h != INVALID_HANDLE_VALUE)
+        {
+            char ruta[MAX_PATH];
+            if (GetFinalPathNameByHandleA(h, ruta, MAX_PATH, FILE_NAME_NORMALIZED))
+                printf("  Resuelve a: %s\n", ruta);
+            else
+                printf("  Resuelve a: N/D\n");
+            CloseHandle(h);
+        }
+
+        /* Leer el contenido a través del enlace */
+        f = fopen(simbolico, "r");
+        if (f)
+        {
+            char linea[256];
+            printf("  Contenido leído por el enlace: ");
+            if (fgets(linea, sizeof(linea), f))
+                printf("%s", linea);
+            fclose(f);
+        }
+
+        /* Romper el enlace: borrar el destino */
+        DeleteFileA(original);
+        printf("\nDespués de borrar el original:\n");
+        f = fopen(simbolico, "r");
+        if (!f)
+            printf("  El enlace quedó roto (abrirlo falla)\n");
+        else
+            fclose(f);
+        attr = GetFileAttributesA(simbolico);
+        printf("  El enlace como entrada sigue existiendo: %s\n",
+               (attr != INVALID_FILE_ATTRIBUTES) ? "sí" : "no (N/D)");
+
+        DeleteFileA(simbolico);
+    }
+}
+
+char win[MAX_PATH];
+if (!GetWindowsDirectoryA(win, MAX_PATH))
+{
+    fprintf(stderr, "GetWindowsDirectory fallo: %lu\n", GetLastError());
+}
+else
+{
+
+    char root[4] = {win[0], ':', '\\', 0};
+    char drive[3] = {win[0], ':', 0};
+
+    char label[MAX_PATH] = "", fs[MAX_PATH] = "", dev[MAX_PATH] = "", max_nombre[MAX_PATH] = "";
+    DWORD serial = 0;
+
+    if (!GetVolumeInformationA(root, label, sizeof(label), &serial,
+                               max_nombre, &flags, fs, sizeof(fs)))
+    {
+        fprintf(stderr, "GetVolumeInformation fallo: %lu\n", GetLastError());
+    }
+    else
+    {
+        QueryDosDeviceA(drive, dev, sizeof(dev));
+
+        double MB = 1024.0 * 1024.0;
+        printf("INFORMACIÓN DE LA UNIDAD\n");
+        printf("Dispositivo: %s\n", dev);
+        printf("Sistema de archivos: %s\n", fs);
+        printf("Longitud máxima de nombre: %lu\n", max_nombre);
+    }
+    DWORD sec_por_cluster, bytes_por_sector, libres, total;
+    if (GetDiskFreeSpaceA(raiz, &sec_por_cluster, &bytes_por_sector,
+                          &libres, &total))
+    {
+        printf("Bytes por sector: %lu\n", bytes_por_sector);
+        printf("Sectores por clúster: %lu\n", sec_por_cluster);
+        printf("Unidad de asignación (clúster): %lu bytes\n",
+               sec_por_cluster * bytes_por_sector);
+    }
+}
+return 0;
 }

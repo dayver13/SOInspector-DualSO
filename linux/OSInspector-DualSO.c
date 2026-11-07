@@ -343,6 +343,9 @@ int main(void)
     // Sistema de archivos
     const char *original = "archivo.txt";
     const char *enlace = "archivo_hardlink.txt";
+    const char *simbolico = "archivo_symlink.txt";
+
+    unlink(simbolico);
 
     /* Crear el archivo regular */
     f = fopen(original, "w");
@@ -380,6 +383,113 @@ int main(void)
 
             unlink(enlace);
         }
+    }
+
+    f = fopen(original, "w");
+    if (!f)
+    {
+        perror("fopen");
+    }
+    else
+    {
+        fputs("Contenido de prueba\n", f);
+        fclose(f);
+
+        if (symlink(original, simbolico) != 0)
+        {
+            printf("Enlace simbólico: N/D (%s)\n", strerror(errno));
+            unlink(original);
+        }
+        else
+        {
+
+            struct stat st_link, st_dest;
+            char destino[256];
+            ssize_t n = readlink(simbolico, destino, sizeof(destino) - 1);
+            if (n >= 0)
+                destino[n] = '\0';
+            else
+                strcpy(destino, "N/D");
+
+            if (lstat(simbolico, &st_link) != 0 || stat(simbolico, &st_dest) != 0)
+            {
+                printf("Enlace simbólico creado, pero no se pudo consultar: N/D\n");
+                unlink(simbolico);
+                unlink(original);
+            }
+            else
+            {
+
+                printf("Enlace simbólico: %s -> %s\n", simbolico, destino);
+                printf("  Es enlace simbólico (lstat): %s\n", S_ISLNK(st_link.st_mode) ? "sí" : "no");
+                printf("  Inodo del enlace:  %llu  tamaño: %lld bytes (largo de la ruta)\n",
+                       (unsigned long long)st_link.st_ino, (long long)st_link.st_size);
+                printf("  Inodo del destino: %llu  tamaño: %lld bytes\n",
+                       (unsigned long long)st_dest.st_ino, (long long)st_dest.st_size);
+                printf("  Enlaces del destino: %lu\n", (unsigned long)st_dest.st_nlink);
+
+                /* Leer el contenido a través del enlace */
+                f = fopen(simbolico, "r");
+                if (f)
+                {
+                    char linea[256];
+                    printf("  Contenido leído por el enlace: ");
+                    if (fgets(linea, sizeof(linea), f))
+                        printf("%s", linea);
+                    fclose(f);
+                }
+
+                /* Romper el enlace: borrar el destino */
+                unlink(original);
+                printf("\nDespués de borrar el original:\n");
+                if (fopen(simbolico, "r") == NULL)
+                    printf("  El enlace quedó roto (abrirlo falla: %s)\n", strerror(errno));
+                printf("  lstat sigue funcionando: %s\n",
+                       lstat(simbolico, &st_link) == 0 ? "sí, el enlace existe" : "no");
+
+                unlink(simbolico);
+            }
+        }
+    }
+
+    f = setmntent("/proc/mounts", "r");
+    if (!f)
+    {
+        perror("setmntent");
+    }
+    else
+    {
+        const char *ruta = "/";
+
+        struct mntent *m;
+        char dev[256] = "desconocido", fs[64] = "desconocido", mnt[256] = "desconocido";
+
+        /* Si la ruta aparece varias veces, la última es la vigente */
+        while ((m = getmntent(f)) != NULL)
+        {
+            if (strcmp(m->mnt_dir, ruta) == 0)
+            {
+                snprintf(dev, sizeof(dev), "%s", m->mnt_fsname);
+                snprintf(fs, sizeof(fs), "%s", m->mnt_type);
+                snprintf(mnt, sizeof(mnt), "%s", m->mnt_dir);
+            }
+        }
+        endmntent(f);
+
+        struct statvfs sv;
+        if (statvfs(ruta, &sv) != 0)
+        {
+            perror("statvfs");
+            return 1;
+        }
+
+        double MB = 1024.0 * 1024.0;
+        double total = (double)sv.f_blocks * sv.f_frsize / MB;
+        printf("\nINFORMACIÓN DE LA UNIDAD\n");
+        printf("Sistema de archivos: %s\n", fs);
+        printf("Tamaño de bloque fundamental (f_frsize): %lu bytes\n", sv.f_frsize);
+        printf("Tamaño de bloque preferido de E/S (f_bsize): %lu bytes\n", sv.f_bsize);
+        printf("Longitud máxima de nombre: %lu\n", sv.f_namemax);
     }
 
     return 0;
