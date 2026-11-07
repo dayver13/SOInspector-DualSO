@@ -483,8 +483,6 @@ int main(void)
             return 1;
         }
 
-        double MB = 1024.0 * 1024.0;
-        double total = (double)sv.f_blocks * sv.f_frsize / MB;
         printf("\nINFORMACIÓN DE LA UNIDAD\n");
         printf("Sistema de archivos: %s\n", fs);
         printf("Tamaño de bloque fundamental (f_frsize): %lu bytes\n", sv.f_frsize);
