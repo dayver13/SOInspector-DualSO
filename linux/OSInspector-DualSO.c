@@ -8,6 +8,25 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <stdarg.h>
+
+#define ARCHIVO_REPORTE "reporte_fs.txt"
+
+static FILE *log_f = NULL;
+
+static void out(const char *fmt, ...)
+{
+    va_list a;
+    va_start(a, fmt);
+    vprintf(fmt, a);
+    va_end(a);
+    if (log_f)
+    {
+        va_start(a, fmt);
+        vfprintf(log_f, fmt, a);
+        va_end(a);
+    }
+}
 
 static int leer_ull(const char *ruta, unsigned long long *v)
 {
@@ -30,7 +49,7 @@ static void mostrar_fecha(const char *etiqueta, time_t t)
 {
     char buf[64];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t));
-    printf("%-22s %s\n", etiqueta, buf);
+    out("%-22s %s\n", etiqueta, buf);
 }
 
 static void info(const char *ruta)
@@ -54,14 +73,14 @@ static void info(const char *ruta)
              (st.st_mode & S_IWOTH) ? 'w' : '-',
              (st.st_mode & S_IXOTH) ? 'x' : '-');
 
-    printf("Archivo: %s\n", ruta);
-    printf("Tipo: %s\n", S_ISREG(st.st_mode) ? "archivo regular" : "otro");
-    printf("Tamaño: %lld bytes\n", (long long)st.st_size);
-    printf("Permisos: %s (%04o)\n", p, st.st_mode & 07777);
+    out("Archivo: %s\n", ruta);
+    out("Tipo: %s\n", S_ISREG(st.st_mode) ? "archivo regular" : "otro");
+    out("Tamaño: %lld bytes\n", (long long)st.st_size);
+    out("Permisos: %s (%04o)\n", p, st.st_mode & 07777);
     mostrar_fecha("Último acceso:", st.st_atime);
     mostrar_fecha("Última modificación:", st.st_mtime);
     mostrar_fecha("Último cambio (inodo):", st.st_ctime);
-    printf("\n");
+    out("\n");
 }
 
 static void comparar_inodos(const char *a, const char *b)
@@ -78,16 +97,16 @@ static void comparar_inodos(const char *a, const char *b)
         return;
     }
 
-    printf("== Comparación de inodos ==\n");
-    printf("  %-22s inodo: %llu  dispositivo: %llu\n", a,
-           (unsigned long long)sa.st_ino, (unsigned long long)sa.st_dev);
-    printf("  %-22s inodo: %llu  dispositivo: %llu\n", b,
-           (unsigned long long)sb.st_ino, (unsigned long long)sb.st_dev);
+    out("== Comparación de inodos ==\n");
+    out("  %-22s inodo: %llu  dispositivo: %llu\n", a,
+        (unsigned long long)sa.st_ino, (unsigned long long)sa.st_dev);
+    out("  %-22s inodo: %llu  dispositivo: %llu\n", b,
+        (unsigned long long)sb.st_ino, (unsigned long long)sb.st_dev);
 
     if (sa.st_ino == sb.st_ino && sa.st_dev == sb.st_dev)
-        printf("  Resultado: IGUALES, ambos nombres apuntan al mismo archivo\n\n");
+        out("  Resultado: IGUALES, ambos nombres apuntan al mismo archivo\n\n");
     else
-        printf("  Resultado: DISTINTOS, son archivos diferentes\n\n");
+        out("  Resultado: DISTINTOS, son archivos diferentes\n\n");
 }
 
 int main(void)
@@ -105,8 +124,8 @@ int main(void)
 
     // Obtener el tamaño de página del sistema
     page_size = getpagesize();
-    printf("INFO MEMORIA DEL SISTEMA\n");
-    printf("Tamaño de página: %lu bytes\n", page_size);
+    out("INFO MEMORIA DEL SISTEMA\n");
+    out("Tamaño de página: %lu bytes\n", page_size);
 
     // Abrir el archivo /proc/meminfo para leer la información de memoria
     FILE *f = fopen("/proc/meminfo", "r");
@@ -129,21 +148,21 @@ int main(void)
         unsigned long total_pages = (total_kb * 1024UL) / page_size;
 
         // Imprimir la información del sistema
-        printf("Memoria total: %lu MB\n", total_kb / 1024);
-        printf("Memoria libre: %lu MB\n", free_kb / 1024);
-        printf("Memoria disponible: %lu MB\n", avail_kb / 1024);
-        printf("Número total de páginas: %lu\n", total_pages);
-        printf("Swap total: %.2f MB\n", swap_total_kb / 1024.0);
-        printf("Swap libre: %.2f MB\n", swap_free_kb / 1024.0);
-        printf("Swap en uso: %.2f MB\n", (swap_total_kb - swap_free_kb) / 1024.0);
-        printf("\n");
+        out("Memoria total: %lu MB\n", total_kb / 1024);
+        out("Memoria libre: %lu MB\n", free_kb / 1024);
+        out("Memoria disponible: %lu MB\n", avail_kb / 1024);
+        out("Número total de páginas: %lu\n", total_pages);
+        out("Swap total: %.2f MB\n", swap_total_kb / 1024.0);
+        out("Swap libre: %.2f MB\n", swap_free_kb / 1024.0);
+        out("Swap en uso: %.2f MB\n", (swap_total_kb - swap_free_kb) / 1024.0);
+        out("\n");
     }
 
     // Abrir el archivo /proc/vmstat para leer la información de fallos de página
     f = fopen("/proc/vmstat", "r");
     if (!f)
     {
-        printf("Fallos de página: no disponible\n");
+        out("Fallos de página: no disponible\n");
     }
     else
     {
@@ -175,15 +194,15 @@ int main(void)
 
         if (found == 0)
         {
-            printf("Fallos de página: no disponible\n");
+            out("Fallos de página: no disponible\n");
         }
         else
         {
             // Imprimir la información de fallos de página
-            printf("Fallos de página totales: %llu\n", pgfault);
-            printf("Fallos mayores (lectura de disco): %llu\n", pgmajfault);
-            printf("KB leídos desde disco (pgpgin): %llu\n", pgpgin);
-            printf("Páginas leídas desde swap (pswpin): %llu\n", pswpin);
+            out("Fallos de página totales: %llu\n", pgfault);
+            out("Fallos mayores (lectura de disco): %llu\n", pgmajfault);
+            out("KB leídos desde disco (pgpgin): %llu\n", pgpgin);
+            out("Páginas leídas desde swap (pswpin): %llu\n", pswpin);
         }
     }
 
@@ -220,11 +239,11 @@ int main(void)
 
         double MB = 1024.0 * 1024.0;
         double total = (double)sv.f_blocks * sv.f_frsize / MB;
-        printf("\nINFORMACIÓN DEL VOLUMEN PRINCIPAL\n");
-        printf("Dispositivo principal: %s\n", dev);
-        printf("Punto de montaje: %s\n", mnt);
-        printf("Sistema de archivos: %s\n", fs);
-        printf("Tamaño del volumen: %.2f MB\n", total);
+        out("\nINFORMACIÓN DEL VOLUMEN PRINCIPAL\n");
+        out("Dispositivo principal: %s\n", dev);
+        out("Punto de montaje: %s\n", mnt);
+        out("Sistema de archivos: %s\n", fs);
+        out("Tamaño del volumen: %.2f MB\n", total);
     }
 
     DIR *d = opendir("/sys/block");
@@ -235,8 +254,8 @@ int main(void)
     else
     {
 
-        printf("== Dispositivos de bloque ==\n");
-        printf("%-14s %12s  %s\n", "Dispositivo", "Tamaño (MB)", "Tipo");
+        out("== Dispositivos de bloque ==\n");
+        out("%-14s %12s  %s\n", "Dispositivo", "Tamaño (MB)", "Tipo");
 
         struct dirent *e;
         while ((e = readdir(d)) != NULL)
@@ -261,13 +280,13 @@ int main(void)
                                             : "desconocido";
 
             /* los sectores de /sys/block siempre son de 512 bytes */
-            printf("%-14s %12.2f  %s\n", e->d_name,
-                   sectores * 512.0 / (1024.0 * 1024.0), tipo);
+            out("%-14s %12.2f  %s\n", e->d_name,
+                sectores * 512.0 / (1024.0 * 1024.0), tipo);
         }
         closedir(d);
 
-        printf("== Contadores de E/S (desde el arranque) ==\n");
-        printf("%-14s %14s %14s\n", "Dispositivo", "Lecturas", "Escrituras");
+        out("== Contadores de E/S (desde el arranque) ==\n");
+        out("%-14s %14s %14s\n", "Dispositivo", "Lecturas", "Escrituras");
     }
 
     f = fopen("/proc/diskstats", "r");
@@ -290,11 +309,11 @@ int main(void)
                 if (strncmp(nombre, "loop", 4) == 0 ||
                     strncmp(nombre, "ram", 3) == 0)
                     continue;
-                printf("%-14s %14llu %14llu\n", nombre, lect, escr);
+                out("%-14s %14llu %14llu\n", nombre, lect, escr);
             }
         }
         fclose(f);
-        printf("\n");
+        out("\n");
     }
 
     char *buf = calloc(1024 * 1024, 1);
@@ -330,10 +349,10 @@ int main(void)
             fclose(f);
             double t_lec = ahora() - t0;
 
-            printf("== Prueba de velocidad de lectura y escritura ==\n");
-            printf("Escritura: %.3f s (%.1f MiB/s)\n", t_esc, 256 / t_esc);
-            printf("Lectura:   %.3f s (%.1f MiB/s)\n", t_lec, 256 / t_lec);
-            printf("\n");
+            out("== Prueba de velocidad de lectura y escritura ==\n");
+            out("Escritura: %.3f s (%.1f MiB/s)\n", t_esc, 256 / t_esc);
+            out("Lectura:   %.3f s (%.1f MiB/s)\n", t_lec, 256 / t_lec);
+            out("\n");
 
             remove("prueba.bin");
             free(buf);
@@ -358,8 +377,8 @@ int main(void)
         fputs("Contenido de prueba\n", f);
         fclose(f);
 
-        printf("CONSULTAS SISTEMA DE ARCHIVOS\n");
-        printf("== Antes del hard link ==\n");
+        out("CONSULTAS SISTEMA DE ARCHIVOS\n");
+        out("== Antes del hard link ==\n");
         info(original);
 
         /* Crear el hard link */
@@ -370,7 +389,7 @@ int main(void)
         else
         {
 
-            printf("== Después del hard link ==\n");
+            out("== Después del hard link ==\n");
             info(original);
             info(enlace);
 
@@ -378,7 +397,7 @@ int main(void)
 
             /* Borrar el original: el contenido sigue accesible por el enlace */
             unlink(original);
-            printf("== Después de borrar el original ==\n");
+            out("== Después de borrar el original ==\n");
             info(enlace);
 
             unlink(enlace);
@@ -397,7 +416,7 @@ int main(void)
 
         if (symlink(original, simbolico) != 0)
         {
-            printf("Enlace simbólico: N/D (%s)\n", strerror(errno));
+            out("Enlace simbólico: N/D (%s)\n", strerror(errno));
             unlink(original);
         }
         else
@@ -413,39 +432,39 @@ int main(void)
 
             if (lstat(simbolico, &st_link) != 0 || stat(simbolico, &st_dest) != 0)
             {
-                printf("Enlace simbólico creado, pero no se pudo consultar: N/D\n");
+                out("Enlace simbólico creado, pero no se pudo consultar: N/D\n");
                 unlink(simbolico);
                 unlink(original);
             }
             else
             {
 
-                printf("Enlace simbólico: %s -> %s\n", simbolico, destino);
-                printf("  Es enlace simbólico (lstat): %s\n", S_ISLNK(st_link.st_mode) ? "sí" : "no");
-                printf("  Inodo del enlace:  %llu  tamaño: %lld bytes (largo de la ruta)\n",
-                       (unsigned long long)st_link.st_ino, (long long)st_link.st_size);
-                printf("  Inodo del destino: %llu  tamaño: %lld bytes\n",
-                       (unsigned long long)st_dest.st_ino, (long long)st_dest.st_size);
-                printf("  Enlaces del destino: %lu\n", (unsigned long)st_dest.st_nlink);
+                out("Enlace simbólico: %s -> %s\n", simbolico, destino);
+                out("  Es enlace simbólico (lstat): %s\n", S_ISLNK(st_link.st_mode) ? "sí" : "no");
+                out("  Inodo del enlace:  %llu  tamaño: %lld bytes (largo de la ruta)\n",
+                    (unsigned long long)st_link.st_ino, (long long)st_link.st_size);
+                out("  Inodo del destino: %llu  tamaño: %lld bytes\n",
+                    (unsigned long long)st_dest.st_ino, (long long)st_dest.st_size);
+                out("  Enlaces del destino: %lu\n", (unsigned long)st_dest.st_nlink);
 
                 /* Leer el contenido a través del enlace */
                 f = fopen(simbolico, "r");
                 if (f)
                 {
                     char linea[256];
-                    printf("  Contenido leído por el enlace: ");
+                    out("  Contenido leído por el enlace: ");
                     if (fgets(linea, sizeof(linea), f))
-                        printf("%s", linea);
+                        out("%s", linea);
                     fclose(f);
                 }
 
                 /* Romper el enlace: borrar el destino */
                 unlink(original);
-                printf("\nDespués de borrar el original:\n");
+                out("\nDespués de borrar el original:\n");
                 if (fopen(simbolico, "r") == NULL)
-                    printf("  El enlace quedó roto (abrirlo falla: %s)\n", strerror(errno));
-                printf("  lstat sigue funcionando: %s\n",
-                       lstat(simbolico, &st_link) == 0 ? "sí, el enlace existe" : "no");
+                    out("  El enlace quedó roto (abrirlo falla: %s)\n", strerror(errno));
+                out("  lstat sigue funcionando: %s\n",
+                    lstat(simbolico, &st_link) == 0 ? "sí, el enlace existe" : "no");
 
                 unlink(simbolico);
             }
@@ -490,14 +509,14 @@ int main(void)
             double usado = ((double)sv.f_blocks - sv.f_bfree) * sv.f_frsize;
             double pct = (usado + libre) > 0 ? 100.0 * usado / (usado + libre) : 0;
 
-            printf("\nINFORMACIÓN DE LA UNIDAD\n");
-            printf("Sistema de archivos: %s\n", fs);
-            printf("Tamaño de bloque fundamental (f_frsize): %lu bytes\n", sv.f_frsize);
-            printf("Tamaño de bloque preferido de E/S (f_bsize): %lu bytes\n", sv.f_bsize);
-            printf("Longitud máxima de nombre: %lu\n", sv.f_namemax);
-            printf("Capacidad total: %.2f MB\n", capacidad / MB);
-            printf("Espacio usado: %.2f MB (%.1f%%)\n", usado / MB, pct);
-            printf("Espacio libre: %.2f MB\n", libre / MB);
+            out("\nINFORMACIÓN DE LA UNIDAD\n");
+            out("Sistema de archivos: %s\n", fs);
+            out("Tamaño de bloque fundamental (f_frsize): %lu bytes\n", sv.f_frsize);
+            out("Tamaño de bloque preferido de E/S (f_bsize): %lu bytes\n", sv.f_bsize);
+            out("Longitud máxima de nombre: %lu\n", sv.f_namemax);
+            out("Capacidad total: %.2f MB\n", capacidad / MB);
+            out("Espacio usado: %.2f MB (%.1f%%)\n", usado / MB, pct);
+            out("Espacio libre: %.2f MB\n", libre / MB);
         }
     }
 
