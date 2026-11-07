@@ -54,7 +54,6 @@ static void info(const char *ruta)
              (st.st_mode & S_IWOTH) ? 'w' : '-',
              (st.st_mode & S_IXOTH) ? 'x' : '-');
 
-    printf("\nSISTEMA DE ARCHIVOS\n");
     printf("Archivo: %s\n", ruta);
     printf("Tipo: %s\n", S_ISREG(st.st_mode) ? "archivo regular" : "otro");
     printf("Tamaño: %lld bytes\n", (long long)st.st_size);
@@ -80,7 +79,7 @@ int main(void)
 
     // Obtener el tamaño de página del sistema
     page_size = getpagesize();
-    printf("MEMORIA DEL SISTEMA\n");
+    printf("INFO MEMORIA DEL SISTEMA\n");
     printf("Tamaño de página: %lu bytes\n", page_size);
 
     // Abrir el archivo /proc/meminfo para leer la información de memoria
@@ -330,6 +329,7 @@ int main(void)
         fputs("Contenido de prueba\n", f);
         fclose(f);
 
+        printf("CONSULTAS SISTEMA DE ARCHIVOS\n");
         printf("== Antes del hard link ==\n");
         info(original);
 
