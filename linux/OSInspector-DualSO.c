@@ -166,6 +166,15 @@ int main(int argc, char *argv[])
     out("Nombre del equipo (hostname): %s\n", host);
     out("Sistema operativo: %s\n\n", distro);
 
+    struct stat st;
+    if (stat(ruta, &st) != 0)
+    {
+        perror("stat");
+        if (log_f)
+            fclose(log_f);
+        return 1;
+    }
+
     // Declaración de variables info memoria
     unsigned long page_size;
     char line[256];
