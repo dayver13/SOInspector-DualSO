@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <time.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -107,7 +108,7 @@ static void comparar_inodos(const char *a, const char *b)
         out("  Resultado: DISTINTOS, son archivos diferentes\n\n");
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     const char *ruta = (argc > 1) ? argv[1] : "/";
 
@@ -121,8 +122,8 @@ int main(void)
             *p = '_';
 
     /* Fecha para el nombre y para el encabezado */
-    time_t ahora = time(NULL);
-    struct tm *tm_local = localtime(&ahora);
+    time_t tahora = time(NULL);
+    struct tm *tm_local = localtime(&tahora);
     char fecha_archivo[32], fecha_texto[64];
     strftime(fecha_archivo, sizeof(fecha_archivo), "%Y-%m-%d_%H-%M-%S", tm_local);
     strftime(fecha_texto, sizeof(fecha_texto), "%Y-%m-%d %H:%M:%S", tm_local);
