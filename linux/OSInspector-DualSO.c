@@ -113,16 +113,13 @@ int main(void)
 {
     log_f = fopen(ARCHIVO_REPORTE, "w"); /* usa "a" para ir acumulando corridas */
     if (!log_f)
-        out(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
-            ARCHIVO_REPORTE);
+        fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
+                ARCHIVO_REPORTE);
 
     char host[256];
     if (gethostname(host, sizeof(host)) != 0)
         strcpy(host, "N/D");
     host[sizeof(host) - 1] = '\0';
-
-    struct utsname u;
-    int ok = (uname(&u) == 0);
 
     /* Nombre de la distribución */
     char distro[256] = "N/D";
