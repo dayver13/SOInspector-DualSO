@@ -578,7 +578,11 @@ int main(int argc, char *argv[])
     if (log_f)
     {
         fclose(log_f);
-        printf("\nReporte guardado en %s\n", ARCHIVO_REPORTE);
+        char cwd[512];
+        if (getcwd(cwd, sizeof(cwd)))
+            printf("\nReporte guardado en: %s/%s\n", cwd, nombre_reporte);
+        else
+            printf("\nReporte guardado en: %s\n", nombre_reporte);
     }
 
     return 0;
