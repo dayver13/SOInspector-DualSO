@@ -19,7 +19,7 @@ Cada script debe estar en la misma carpeta que su archivo `.c`.
 - **Prueba de velocidad:** escribe y lee un archivo temporal de 256 MiB y muestra los MiB/s.
 - **Enlaces:** crea un hard link y un enlace simbólico de prueba, compara sus datos y muestra qué pasa al borrar el original.
 
-Los archivos temporales (`prueba.bin`, `archivo.txt`, `archivo_hardlink.txt`, `archivo_symlink.txt`) se borran solos al terminar. El único archivo que queda es `reporte_fs.txt`.
+Los archivos temporales (`prueba.bin`, `archivo.txt`, `archivo_hardlink.txt`, `archivo_symlink.txt`) se borran solos al terminar. El único archivo que queda es ` reporte_<plataforma>_<hostname>_<fecha>.txt `.
 
 ---
 
