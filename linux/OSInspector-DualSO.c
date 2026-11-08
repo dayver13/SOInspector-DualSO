@@ -10,8 +10,6 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#define ARCHIVO_REPORTE "reporte_fs.txt"
-
 static FILE *log_f = NULL;
 
 static void out(const char *fmt, ...)
@@ -111,15 +109,32 @@ static void comparar_inodos(const char *a, const char *b)
 
 int main(void)
 {
-    log_f = fopen(ARCHIVO_REPORTE, "w"); /* usa "a" para ir acumulando corridas */
-    if (!log_f)
-        fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
-                ARCHIVO_REPORTE);
+    const char *ruta = (argc > 1) ? argv[1] : "/";
 
+    /* Hostname (limpiado para que sea válido en un nombre de archivo) */
     char host[256];
     if (gethostname(host, sizeof(host)) != 0)
-        strcpy(host, "N/D");
+        strcpy(host, "desconocido");
     host[sizeof(host) - 1] = '\0';
+    for (char *p = host; *p; p++)
+        if (!isalnum((unsigned char)*p) && *p != '-' && *p != '.')
+            *p = '_';
+
+    /* Fecha para el nombre y para el encabezado */
+    time_t ahora = time(NULL);
+    struct tm *tm_local = localtime(&ahora);
+    char fecha_archivo[32], fecha_texto[64];
+    strftime(fecha_archivo, sizeof(fecha_archivo), "%Y-%m-%d_%H-%M-%S", tm_local);
+    strftime(fecha_texto, sizeof(fecha_texto), "%Y-%m-%d %H:%M:%S", tm_local);
+
+    /* Nombre del reporte: reporte_linux_<hostname>_<fecha>.txt */
+    char nombre_reporte[512];
+    snprintf(nombre_reporte, sizeof(nombre_reporte),
+             "reporte_linux_%s_%s.txt", host, fecha_archivo);
+
+    log_f = fopen(nombre_reporte, "w");
+    if (!log_f)
+        perror("No se pudo crear el reporte, impresion solo en pantalla");
 
     /* Nombre de la distribución */
     char distro[256] = "N/D";
