@@ -8,6 +8,7 @@
 #include <io.h>
 #include <stdarg.h>
 #include <time.h>
+#include <ctype.h>
 
 #ifndef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
 #define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
@@ -16,8 +17,6 @@
 #ifndef FILE_NAME_NORMALIZED
 #define FILE_NAME_NORMALIZED 0x0
 #endif
-
-#define ARCHIVO_REPORTE "reporte_fs.txt"
 
 static FILE *log_f = NULL;
 
@@ -117,20 +116,34 @@ static void info(const char *ruta)
     }
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     SetConsoleOutputCP(CP_UTF8); /* para que los acentos se vean bien en consola */
 
-    log_f = fopen(ARCHIVO_REPORTE, "w"); /* usa "a" para ir acumulando corridas */
-    if (!log_f)
-        fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
-                ARCHIVO_REPORTE);
-
-    /* Nombre del equipo */
+    /* Hostname (limpiado para que sea válido en un nombre de archivo) */
     char host[MAX_COMPUTERNAME_LENGTH + 1];
     DWORD n = sizeof(host);
     if (!GetComputerNameA(host, &n))
-        strcpy(host, "N/D");
+        strcpy(host, "desconocido");
+    for (char *p = host; *p; p++)
+        if (!isalnum((unsigned char)*p) && *p != '-' && *p != '.')
+            *p = '_';
+
+    /* Fecha para el nombre y para el encabezado */
+    time_t tahora = time(NULL);
+    struct tm *tm_local = localtime(&tahora);
+    char fecha_archivo[32], fecha_texto[64];
+    strftime(fecha_archivo, sizeof(fecha_archivo), "%Y-%m-%d_%H-%M-%S", tm_local);
+    strftime(fecha_texto, sizeof(fecha_texto), "%Y-%m-%d %H:%M:%S", tm_local);
+
+    /* Nombre del reporte: reporte_windows_<hostname>_<fecha>.txt */
+    char nombre_reporte[512];
+    snprintf(nombre_reporte, sizeof(nombre_reporte),
+             "reporte_windows_%s_%s.txt", host, fecha_archivo);
+
+    log_f = fopen(nombre_reporte, "w");
+    if (!log_f)
+        perror("No se pudo crear el reporte");
 
     /* Versión real del sistema */
     OSVERSIONINFOW vi;
@@ -569,7 +582,11 @@ int main(void)
     if (log_f)
     {
         fclose(log_f);
-        printf("\nReporte guardado en %s\n", ARCHIVO_REPORTE);
+        char cwd[MAX_PATH];
+        if (GetCurrentDirectoryA(MAX_PATH, cwd))
+            printf("\nReporte guardado en: %s\\%s\n", cwd, nombre_reporte);
+        else
+            printf("\nReporte guardado en: %s\n", nombre_reporte);
     }
     return 0;
 }
