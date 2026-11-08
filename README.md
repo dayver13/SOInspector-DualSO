@@ -116,8 +116,8 @@ Crear enlaces simbólicos requiere ejecutar la terminal como administrador o act
 ## Uso y resultados
 
 1. Ejecuta el programa desde una carpeta donde tengas permiso de escritura.
-2. La información aparece en pantalla y se guarda en `reporte_fs.txt` en la misma carpeta.
-3. Cada ejecución sobrescribe `reporte_fs.txt`. Para acumular corridas, cambia `"w"` por `"a"` en la línea donde se abre `ARCHIVO_REPORTE`.
+2. La información aparece en pantalla y se guarda en `reporte_<plataforma>_<hostname>_<fecha>.txt` en la misma carpeta.
+3. Cada ejecución sobrescribe `reporte_<plataforma>_<hostname>_<fecha>.txt`. 
 4. La prueba de velocidad escribe 256 MiB en disco, así que necesitas ese espacio libre y puede tardar unos segundos.
 
 ## Solución de problemas
@@ -127,5 +127,5 @@ Crear enlaces simbólicos requiere ejecutar la terminal como administrador o act
 | `no hay compilador de C instalado` | Falta gcc, clang o cl | Instala uno según la sección de requisitos |
 | `Permission denied` al ejecutar el `.sh` | Falta el permiso de ejecución | `chmod +x os_inspector_linux.sh` |
 | El `.ps1` no se ejecuta | Política de ejecución de PowerShell | Usa `-ExecutionPolicy Bypass` como se indicó arriba |
-| `no se pudo crear reporte_fs.txt` | Carpeta sin permiso de escritura | Ejecuta desde otra carpeta |
+| `no se pudo crear rreporte_<plataforma>_<hostname>_<fecha>.txt` | Carpeta sin permiso de escritura | Ejecuta desde otra carpeta |
 | Acentos mal mostrados en Windows | Consola sin UTF-8 | Usa Windows Terminal; el programa ya activa UTF-8 con `SetConsoleOutputCP` |
