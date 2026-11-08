@@ -1,3 +1,6 @@
+#define _WIN32_WINNT 0x0601   /* Windows 7 o superior */
+#define WINVER       0x0601
+
 #include <stdio.h>
 #include <windows.h>
 #include <psapi.h>
@@ -10,9 +13,15 @@
 #define SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE 0x2
 #endif
 
+#ifndef FILE_NAME_NORMALIZED
+#define FILE_NAME_NORMALIZED 0x0
+#endif
+
 #define ARCHIVO_REPORTE "reporte_fs.txt"
 
 static FILE *log_f = NULL;
+
+#pragma comment(lib, "psapi.lib")
 
 /* Imprime en pantalla y en el archivo de reporte */
 static void out(const char *fmt, ...)
@@ -45,6 +54,18 @@ static void mostrar_fecha(const char *etiqueta, FILETIME ft)
     FileTimeToSystemTime(&local, &st);
     out("%-22s %04d-%02d-%02d %02d:%02d:%02d\n", etiqueta,
         st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+}
+
+static void mostrar_contenido(const char *ruta) {
+    FILE *f = fopen(ruta, "r");
+    if (!f) { perror("fopen"); return; }
+
+    printf("Contenido leído desde '%s':\n", ruta);
+    char linea[256];
+    while (fgets(linea, sizeof(linea), f))
+        printf("  | %s", linea);
+    fclose(f);
+    printf("\n");
 }
 
 static void info(const char *ruta)
@@ -98,9 +119,14 @@ int main(void)
         fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
                 ARCHIVO_REPORTE);
 
+    const char *original = "archivo.txt";
+    const char *enlace = "archivo_hardlink.txt";
+    const char *simbolico = "archivo_symlink.txt";
+
     // Declaración de variables info memoria
     unsigned long page_size;
     unsigned long long total_bytes, avail_bytes;
+    unsigned long long swap_total, swap_free;
 
     // Obtener el tamaño de página del sistema
     SYSTEM_INFO si;
@@ -132,6 +158,9 @@ int main(void)
         if (swap_free > swap_total)
             swap_free = swap_total;
 
+        unsigned long long total_pages = total_bytes / page_size;
+        unsigned long long swap_used = swap_total - swap_free;
+
         // Imprimir la información del sistema
         out("INFO DE MEMORIA DEL SISTEMA\n");
         out("Tamaño de memoria: %.2f MB\n", total_bytes / (1024.0 * 1024.0));
@@ -155,7 +184,7 @@ int main(void)
         out("Páginas leídas desde swap (pswpin): ND\n");
         out("Fallos de página del proceso: %lu\n", pmc.PageFaultCount);
     }
-    POLL_OUT("\n");
+        out("\n");
 
     char win[MAX_PATH];
     if (!GetWindowsDirectoryA(win, MAX_PATH))
@@ -254,7 +283,7 @@ int main(void)
     else
     {
         double t0 = ahora();
-        f = fopen("prueba.bin", "wb");
+        FILE *f = fopen("prueba.bin", "wb");
         if (!f)
         {
             perror("fopen");
@@ -293,15 +322,12 @@ int main(void)
         free(buf);
     }
 
-    const char *original = "archivo.txt";
-    const char *enlace = "archivo_hardlink.txt";
-    const char *simbolico = "archivo_symlink.txt";
 
     DeleteFileA(enlace);
     DeleteFileA(simbolico); /* por si quedó de una corrida anterior */
 
     /* Crear el archivo regular */
-    f = fopen(original, "w");
+    FILE *f = fopen(original, "w");
     if (!f)
     {
         perror("fopen");
@@ -339,8 +365,8 @@ int main(void)
 
                 out("== Después de modificar por '%s' ==\n", enlace);
                 mostrar_contenido(original);
-                mostrar_info(original);
-                mostrar_info(enlace);
+                info(original);
+                info(enlace);
                 out("\n");
 
                 f = fopen(original, "a");
@@ -362,16 +388,16 @@ int main(void)
             }
         }
     }
-}
-f = fopen(original, "w");
-if (!f)
-{
-    perror("fopen");
-}
-else
-{
-    fputs("Contenido de prueba\n", f);
-    fclose(f);
+    f = fopen(original, "w");
+    if (!f)
+    {
+       perror("fopen");
+    }
+    else
+    {
+        fputs("Contenido de prueba\n", f);
+        fclose(f);
+
 
     /* Intentar el enlace simbólico (primero sin privilegios, útil con Modo desarrollador) */
     BOOLEAN ok = CreateSymbolicLinkA(simbolico, original,
@@ -415,7 +441,7 @@ else
         if (f)
         {
             char linea[256];
-            pout("  Contenido leído por el enlace: ");
+            out("  Contenido leído por el enlace: ");
             if (fgets(linea, sizeof(linea), f))
                 printf("%s", linea);
             fclose(f);
@@ -434,40 +460,49 @@ else
             (attr != INVALID_FILE_ATTRIBUTES) ? "sí" : "no (N/D)");
 
         DeleteFileA(simbolico);
+     }
     }
-}
 
-char win[MAX_PATH];
-if (!GetWindowsDirectoryA(win, MAX_PATH))
-{
+
+    if (!GetWindowsDirectoryA(win, MAX_PATH))
+    {
     fprintf(stderr, "GetWindowsDirectory fallo: %lu\n", GetLastError());
-}
-else
-{
+    }
+    else
+    {
 
     char root[4] = {win[0], ':', '\\', 0};
     char drive[3] = {win[0], ':', 0};
 
-    char label[MAX_PATH] = "", fs[MAX_PATH] = "", dev[MAX_PATH] = "", max_nombre[MAX_PATH] = "";
-    DWORD serial = 0;
+   char  label[MAX_PATH] = "";
+char  fs[MAX_PATH]    = "";
+char  dev[MAX_PATH]   = "";
+DWORD serial          = 0;
+DWORD maxComp         = 0;   // <- antes era char max_nombre[MAX_PATH]
 
-    if (!GetVolumeInformationA(root, label, sizeof(label), &serial,
-                               max_nombre, &flags, fs, sizeof(fs)))
+if (!GetVolumeInformationA(root, label, sizeof(label), &serial,
+                           &maxComp, NULL, fs, sizeof(fs)))
+{
+    fprintf(stderr, "GetVolumeInformation fallo: %lu\n", GetLastError());
+}
+else
+{
+    // drive debe ser del estilo "C:" (sin barra final)
+    if (QueryDosDeviceA(drive, dev, sizeof(dev)) == 0)
     {
-        fprintf(stderr, "GetVolumeInformation fallo: %lu\n", GetLastError());
+        fprintf(stderr, "QueryDosDevice fallo: %lu\n", GetLastError());
+        dev[0] = '\0';
     }
-    else
-    {
-        QueryDosDeviceA(drive, dev, sizeof(dev));
 
-        double MB = 1024.0 * 1024.0;
-        out("INFORMACIÓN DE LA UNIDAD\n");
-        out("Dispositivo: %s\n", dev);
-        out("Sistema de archivos: %s\n", fs);
-        out("Longitud máxima de nombre: %lu\n", max_nombre);
-    }
+    out("\nINFORMACION DE LA UNIDAD\n");
+    out("Etiqueta: %s\n", label);
+    out("Dispositivo: %s\n", dev);
+    out("Sistema de archivos: %s\n", fs);
+    out("Numero de serie: %04lX-%04lX\n", serial >> 16, serial & 0xFFFF);
+    out("Longitud maxima de nombre: %lu\n", maxComp);
+}
     DWORD sec_por_cluster, bytes_por_sector, libres, total;
-    if (GetDiskFreeSpaceA(raiz, &sec_por_cluster, &bytes_por_sector,
+    if (GetDiskFreeSpaceA(root, &sec_por_cluster, &bytes_por_sector,
                           &libres, &total))
     {
         out("Bytes por sector: %lu\n", bytes_por_sector);
@@ -477,7 +512,7 @@ else
     }
 
     ULARGE_INTEGER disponible, capacidad, libre_total;
-    if (GetDiskFreeSpaceExA(raiz, &disponible, &capacidad, &libre_total))
+    if (GetDiskFreeSpaceExA(root, &disponible, &capacidad, &libre_total))
     {
         double MB = 1024.0 * 1024.0;
         double usado = (double)(capacidad.QuadPart - libre_total.QuadPart);
@@ -489,10 +524,10 @@ else
     }
 }
 
-if (log_f)
-{
+    if (log_f)
+    {
     fclose(log_f);
     printf("\nReporte guardado en %s\n", ARCHIVO_REPORTE);
-}
-return 0;
+    }
+    return 0;
 }
