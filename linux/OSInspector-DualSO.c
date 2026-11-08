@@ -57,7 +57,7 @@ static void info(const char *ruta)
     struct stat st;
     if (stat(ruta, &st) != 0)
     {
-        perror("stat");
+        out("Error al obtener información de %s\n", ruta);
         return;
     }
 
@@ -88,12 +88,12 @@ static void comparar_inodos(const char *a, const char *b)
     struct stat sa, sb;
     if (stat(a, &sa) != 0)
     {
-        perror(a);
+        out("Error al obtener información de %s\n", a);
         return;
     }
     if (stat(b, &sb) != 0)
     {
-        perror(b);
+        out("Error al obtener información de %s\n", b);
         return;
     }
 
@@ -113,8 +113,45 @@ int main(void)
 {
     log_f = fopen(ARCHIVO_REPORTE, "w"); /* usa "a" para ir acumulando corridas */
     if (!log_f)
-        fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
-                ARCHIVO_REPORTE);
+        out(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
+            ARCHIVO_REPORTE);
+
+    char host[256];
+    if (gethostname(host, sizeof(host)) != 0)
+        strcpy(host, "N/D");
+    host[sizeof(host) - 1] = '\0';
+
+    struct utsname u;
+    int ok = (uname(&u) == 0);
+
+    /* Nombre de la distribución */
+    char distro[256] = "N/D";
+    FILE *f = fopen("/etc/os-release", "r");
+    if (f)
+    {
+        char linea[512];
+        while (fgets(linea, sizeof(linea), f))
+        {
+            if (strncmp(linea, "PRETTY_NAME=", 12) == 0)
+            {
+                char *v = linea + 12;
+                v[strcspn(v, "\n")] = '\0';
+                if (v[0] == '"')
+                {
+                    v++;
+                    char *fin = strrchr(v, '"');
+                    if (fin)
+                        *fin = '\0';
+                }
+                snprintf(distro, sizeof(distro), "%s", v);
+                break;
+            }
+        }
+        fclose(f);
+    }
+
+    out("Nombre del equipo (hostname): %s\n", host);
+    out("Sistema operativo: %s\n\n", distro);
 
     // Declaración de variables info memoria
     unsigned long page_size;
@@ -133,10 +170,10 @@ int main(void)
     out("Tamaño de página: %lu bytes\n", page_size);
 
     // Abrir el archivo /proc/meminfo para leer la información de memoria
-    FILE *f = fopen("/proc/meminfo", "r");
+    f = fopen("/proc/meminfo", "r");
     if (!f)
     {
-        perror("fopen");
+        out("Error al abrir /proc/meminfo\n");
     }
     else
     {
@@ -214,7 +251,7 @@ int main(void)
     f = setmntent("/proc/mounts", "r");
     if (!f)
     {
-        perror("setmntent");
+        out("setmntent");
     }
     else
     {
@@ -238,7 +275,7 @@ int main(void)
         struct statvfs sv;
         if (statvfs(ruta, &sv) != 0)
         {
-            perror("statvfs");
+            out("statvfs");
             return 1;
         }
 
@@ -254,7 +291,7 @@ int main(void)
     DIR *d = opendir("/sys/block");
     if (!d)
     {
-        perror("opendir /sys/block");
+        out("Error al abrir /sys/block\n");
     }
     else
     {
@@ -297,7 +334,7 @@ int main(void)
     f = fopen("/proc/diskstats", "r");
     if (!f)
     {
-        perror("fopen /proc/diskstats");
+        out("Error al abrir /proc/diskstats\n");
     }
     else
     {
@@ -329,7 +366,7 @@ int main(void)
     f = fopen("prueba.bin", "wb");
     if (!f)
     {
-        perror("fopen");
+        out("Error al abrir prueba.bin para escritura\n");
     }
     else
     {
@@ -344,7 +381,7 @@ int main(void)
         f = fopen("prueba.bin", "rb");
         if (!f)
         {
-            perror("fopen");
+            out("Error al abrir prueba.bin para lectura\n");
         }
         else
         {
@@ -375,7 +412,7 @@ int main(void)
     f = fopen(original, "w");
     if (!f)
     {
-        perror("fopen");
+        out("Error al abrir %s para escritura\n", original);
     }
     else
     {
@@ -389,7 +426,7 @@ int main(void)
         /* Crear el hard link */
         if (link(original, enlace) != 0)
         {
-            fprintf(stderr, "link fallo: %s\n", strerror(errno));
+            out("Error al crear el hard link: %s\n", strerror(errno));
         }
         else
         {
@@ -412,7 +449,7 @@ int main(void)
     f = fopen(original, "w");
     if (!f)
     {
-        perror("fopen");
+        out("Error al abrir %s para escritura\n", original);
     }
     else
     {
@@ -479,7 +516,7 @@ int main(void)
     f = setmntent("/proc/mounts", "r");
     if (!f)
     {
-        perror("setmntent");
+        out("Error al abrir /proc/mounts\n");
     }
     else
     {
@@ -503,7 +540,7 @@ int main(void)
         struct statvfs sv;
         if (statvfs(ruta, &sv) != 0)
         {
-            perror("statvfs");
+            out("Error al obtener información de volumen\n");
         }
         else
         {

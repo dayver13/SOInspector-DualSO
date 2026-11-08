@@ -1,5 +1,5 @@
-#define _WIN32_WINNT 0x0601   /* Windows 7 o superior */
-#define WINVER       0x0601
+#define _WIN32_WINNT 0x0601 /* Windows 7 o superior */
+#define WINVER 0x0601
 
 #include <stdio.h>
 #include <windows.h>
@@ -22,6 +22,8 @@
 static FILE *log_f = NULL;
 
 #pragma comment(lib, "psapi.lib")
+
+typedef LONG(WINAPI *PFN_RTLGETVERSION)(OSVERSIONINFOW *);
 
 /* Imprime en pantalla y en el archivo de reporte */
 static void out(const char *fmt, ...)
@@ -56,9 +58,14 @@ static void mostrar_fecha(const char *etiqueta, FILETIME ft)
         st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 }
 
-static void mostrar_contenido(const char *ruta) {
+static void mostrar_contenido(const char *ruta)
+{
     FILE *f = fopen(ruta, "r");
-    if (!f) { perror("fopen"); return; }
+    if (!f)
+    {
+        perror("fopen");
+        return;
+    }
 
     printf("Contenido leído desde '%s':\n", ruta);
     char linea[256];
@@ -118,6 +125,44 @@ int main(void)
     if (!log_f)
         fprintf(stderr, "Aviso: no se pudo crear %s, solo se imprimirá en pantalla\n",
                 ARCHIVO_REPORTE);
+
+    /* Nombre del equipo */
+    char host[MAX_COMPUTERNAME_LENGTH + 1];
+    DWORD n = sizeof(host);
+    if (!GetComputerNameA(host, &n))
+        strcpy(host, "N/D");
+
+    /* Versión real del sistema */
+    OSVERSIONINFOW vi;
+    memset(&vi, 0, sizeof(vi));
+    vi.dwOSVersionInfoSize = sizeof(vi);
+
+    int ok = 0;
+    HMODULE nt = GetModuleHandleA("ntdll.dll");
+    if (nt)
+    {
+        PFN_RTLGETVERSION rtl =
+            (PFN_RTLGETVERSION)GetProcAddress(nt, "RtlGetVersion");
+        if (rtl && rtl(&vi) == 0)
+            ok = 1;
+    }
+
+    out("Nombre del equipo (hostname): %s\n", host);
+    if (ok)
+    {
+        const char *nombre = (vi.dwMajorVersion == 10 && vi.dwBuildNumber >= 22000)
+                                 ? "Windows 11"
+                                 : "Windows";
+        out("Sistema operativo: %s\n", nombre);
+        out("Versión: %lu.%lu\n", vi.dwMajorVersion, vi.dwMinorVersion);
+        out("Compilación (build): %lu\n", vi.dwBuildNumber);
+    }
+    else
+    {
+        out("Sistema operativo: N/D\n");
+        out("Versión: N/D\n");
+        out("Compilación (build): N/D\n");
+    }
 
     const char *original = "archivo.txt";
     const char *enlace = "archivo_hardlink.txt";
@@ -184,7 +229,7 @@ int main(void)
         out("Páginas leídas desde swap (pswpin): ND\n");
         out("Fallos de página del proceso: %lu\n", pmc.PageFaultCount);
     }
-        out("\n");
+    out("\n");
 
     char win[MAX_PATH];
     if (!GetWindowsDirectoryA(win, MAX_PATH))
@@ -322,7 +367,6 @@ int main(void)
         free(buf);
     }
 
-
     DeleteFileA(enlace);
     DeleteFileA(simbolico); /* por si quedó de una corrida anterior */
 
@@ -391,143 +435,141 @@ int main(void)
     f = fopen(original, "w");
     if (!f)
     {
-       perror("fopen");
+        perror("fopen");
     }
     else
     {
         fputs("Contenido de prueba\n", f);
         fclose(f);
 
-
-    /* Intentar el enlace simbólico (primero sin privilegios, útil con Modo desarrollador) */
-    BOOLEAN ok = CreateSymbolicLinkA(simbolico, original,
-                                     SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE);
-    if (!ok && GetLastError() == ERROR_INVALID_PARAMETER)
-    {
-        /* Windows antiguo que no reconoce el flag: intento clásico */
-        ok = CreateSymbolicLinkA(simbolico, original, 0);
-    }
-
-    if (!ok)
-    {
-        DWORD err = GetLastError();
-        out("Enlace simbólico: N/D (error %lu%s)\n", err,
-            err == 1314 ? ": falta el privilegio, ejecuta como administrador o activa el Modo desarrollador" : "");
-        DeleteFileA(original);
-    }
-    else
-    {
-
-        DWORD attr = GetFileAttributesA(simbolico);
-        out("Enlace simbólico: %s -> %s\n", simbolico, original);
-        out("  Es enlace simbólico (reparse point): %s\n",
-            (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT)) ? "sí" : "no");
-
-        /* Ruta real a la que resuelve el enlace */
-        HANDLE h = CreateFileA(simbolico, GENERIC_READ, FILE_SHARE_READ, NULL,
-                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (h != INVALID_HANDLE_VALUE)
+        /* Intentar el enlace simbólico (primero sin privilegios, útil con Modo desarrollador) */
+        BOOLEAN ok = CreateSymbolicLinkA(simbolico, original,
+                                         SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE);
+        if (!ok && GetLastError() == ERROR_INVALID_PARAMETER)
         {
-            char ruta[MAX_PATH];
-            if (GetFinalPathNameByHandleA(h, ruta, MAX_PATH, FILE_NAME_NORMALIZED))
-                out("  Resuelve a: %s\n", ruta);
-            else
-                out("  Resuelve a: N/D\n");
-            CloseHandle(h);
+            /* Windows antiguo que no reconoce el flag: intento clásico */
+            ok = CreateSymbolicLinkA(simbolico, original, 0);
         }
 
-        /* Leer el contenido a través del enlace */
-        f = fopen(simbolico, "r");
-        if (f)
+        if (!ok)
         {
-            char linea[256];
-            out("  Contenido leído por el enlace: ");
-            if (fgets(linea, sizeof(linea), f))
-                printf("%s", linea);
-            fclose(f);
+            DWORD err = GetLastError();
+            out("Enlace simbólico: N/D (error %lu%s)\n", err,
+                err == 1314 ? ": falta el privilegio, ejecuta como administrador o activa el Modo desarrollador" : "");
+            DeleteFileA(original);
         }
-
-        /* Romper el enlace: borrar el destino */
-        DeleteFileA(original);
-        out("\nDespués de borrar el original:\n");
-        f = fopen(simbolico, "r");
-        if (!f)
-            out("  El enlace quedó roto (abrirlo falla)\n");
         else
-            fclose(f);
-        attr = GetFileAttributesA(simbolico);
-        out("  El enlace como entrada sigue existiendo: %s\n",
-            (attr != INVALID_FILE_ATTRIBUTES) ? "sí" : "no (N/D)");
+        {
 
-        DeleteFileA(simbolico);
-     }
+            DWORD attr = GetFileAttributesA(simbolico);
+            out("Enlace simbólico: %s -> %s\n", simbolico, original);
+            out("  Es enlace simbólico (reparse point): %s\n",
+                (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT)) ? "sí" : "no");
+
+            /* Ruta real a la que resuelve el enlace */
+            HANDLE h = CreateFileA(simbolico, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                   OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (h != INVALID_HANDLE_VALUE)
+            {
+                char ruta[MAX_PATH];
+                if (GetFinalPathNameByHandleA(h, ruta, MAX_PATH, FILE_NAME_NORMALIZED))
+                    out("  Resuelve a: %s\n", ruta);
+                else
+                    out("  Resuelve a: N/D\n");
+                CloseHandle(h);
+            }
+
+            /* Leer el contenido a través del enlace */
+            f = fopen(simbolico, "r");
+            if (f)
+            {
+                char linea[256];
+                out("  Contenido leído por el enlace: ");
+                if (fgets(linea, sizeof(linea), f))
+                    printf("%s", linea);
+                fclose(f);
+            }
+
+            /* Romper el enlace: borrar el destino */
+            DeleteFileA(original);
+            out("\nDespués de borrar el original:\n");
+            f = fopen(simbolico, "r");
+            if (!f)
+                out("  El enlace quedó roto (abrirlo falla)\n");
+            else
+                fclose(f);
+            attr = GetFileAttributesA(simbolico);
+            out("  El enlace como entrada sigue existiendo: %s\n",
+                (attr != INVALID_FILE_ATTRIBUTES) ? "sí" : "no (N/D)");
+
+            DeleteFileA(simbolico);
+        }
     }
-
 
     if (!GetWindowsDirectoryA(win, MAX_PATH))
     {
-    fprintf(stderr, "GetWindowsDirectory fallo: %lu\n", GetLastError());
+        fprintf(stderr, "GetWindowsDirectory fallo: %lu\n", GetLastError());
     }
     else
     {
 
-    char root[4] = {win[0], ':', '\\', 0};
-    char drive[3] = {win[0], ':', 0};
+        char root[4] = {win[0], ':', '\\', 0};
+        char drive[3] = {win[0], ':', 0};
 
-   char  label[MAX_PATH] = "";
-char  fs[MAX_PATH]    = "";
-char  dev[MAX_PATH]   = "";
-DWORD serial          = 0;
-DWORD maxComp         = 0;   // <- antes era char max_nombre[MAX_PATH]
+        char label[MAX_PATH] = "";
+        char fs[MAX_PATH] = "";
+        char dev[MAX_PATH] = "";
+        DWORD serial = 0;
+        DWORD maxComp = 0; // <- antes era char max_nombre[MAX_PATH]
 
-if (!GetVolumeInformationA(root, label, sizeof(label), &serial,
-                           &maxComp, NULL, fs, sizeof(fs)))
-{
-    fprintf(stderr, "GetVolumeInformation fallo: %lu\n", GetLastError());
-}
-else
-{
-    // drive debe ser del estilo "C:" (sin barra final)
-    if (QueryDosDeviceA(drive, dev, sizeof(dev)) == 0)
-    {
-        fprintf(stderr, "QueryDosDevice fallo: %lu\n", GetLastError());
-        dev[0] = '\0';
+        if (!GetVolumeInformationA(root, label, sizeof(label), &serial,
+                                   &maxComp, NULL, fs, sizeof(fs)))
+        {
+            fprintf(stderr, "GetVolumeInformation fallo: %lu\n", GetLastError());
+        }
+        else
+        {
+            // drive debe ser del estilo "C:" (sin barra final)
+            if (QueryDosDeviceA(drive, dev, sizeof(dev)) == 0)
+            {
+                fprintf(stderr, "QueryDosDevice fallo: %lu\n", GetLastError());
+                dev[0] = '\0';
+            }
+
+            out("\nINFORMACION DE LA UNIDAD\n");
+            out("Etiqueta: %s\n", label);
+            out("Dispositivo: %s\n", dev);
+            out("Sistema de archivos: %s\n", fs);
+            out("Numero de serie: %04lX-%04lX\n", serial >> 16, serial & 0xFFFF);
+            out("Longitud maxima de nombre: %lu\n", maxComp);
+        }
+        DWORD sec_por_cluster, bytes_por_sector, libres, total;
+        if (GetDiskFreeSpaceA(root, &sec_por_cluster, &bytes_por_sector,
+                              &libres, &total))
+        {
+            out("Bytes por sector: %lu\n", bytes_por_sector);
+            out("Sectores por clúster: %lu\n", sec_por_cluster);
+            out("Unidad de asignación (clúster): %lu bytes\n",
+                sec_por_cluster * bytes_por_sector);
+        }
+
+        ULARGE_INTEGER disponible, capacidad, libre_total;
+        if (GetDiskFreeSpaceExA(root, &disponible, &capacidad, &libre_total))
+        {
+            double MB = 1024.0 * 1024.0;
+            double usado = (double)(capacidad.QuadPart - libre_total.QuadPart);
+            double pct = capacidad.QuadPart ? 100.0 * usado / (double)capacidad.QuadPart : 0;
+
+            out("Capacidad total: %.2f MB\n", capacidad.QuadPart / MB);
+            out("Espacio usado: %.2f MB (%.1f%%)\n", usado / MB, pct);
+            out("Espacio libre: %.2f MB\n", disponible.QuadPart / MB);
+        }
     }
-
-    out("\nINFORMACION DE LA UNIDAD\n");
-    out("Etiqueta: %s\n", label);
-    out("Dispositivo: %s\n", dev);
-    out("Sistema de archivos: %s\n", fs);
-    out("Numero de serie: %04lX-%04lX\n", serial >> 16, serial & 0xFFFF);
-    out("Longitud maxima de nombre: %lu\n", maxComp);
-}
-    DWORD sec_por_cluster, bytes_por_sector, libres, total;
-    if (GetDiskFreeSpaceA(root, &sec_por_cluster, &bytes_por_sector,
-                          &libres, &total))
-    {
-        out("Bytes por sector: %lu\n", bytes_por_sector);
-        out("Sectores por clúster: %lu\n", sec_por_cluster);
-        out("Unidad de asignación (clúster): %lu bytes\n",
-            sec_por_cluster * bytes_por_sector);
-    }
-
-    ULARGE_INTEGER disponible, capacidad, libre_total;
-    if (GetDiskFreeSpaceExA(root, &disponible, &capacidad, &libre_total))
-    {
-        double MB = 1024.0 * 1024.0;
-        double usado = (double)(capacidad.QuadPart - libre_total.QuadPart);
-        double pct = capacidad.QuadPart ? 100.0 * usado / (double)capacidad.QuadPart : 0;
-
-        out("Capacidad total: %.2f MB\n", capacidad.QuadPart / MB);
-        out("Espacio usado: %.2f MB (%.1f%%)\n", usado / MB, pct);
-        out("Espacio libre: %.2f MB\n", disponible.QuadPart / MB);
-    }
-}
 
     if (log_f)
     {
-    fclose(log_f);
-    printf("\nReporte guardado en %s\n", ARCHIVO_REPORTE);
+        fclose(log_f);
+        printf("\nReporte guardado en %s\n", ARCHIVO_REPORTE);
     }
     return 0;
 }
