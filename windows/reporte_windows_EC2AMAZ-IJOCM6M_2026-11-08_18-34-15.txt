@@ -1,0 +1,106 @@
+Nombre del equipo (hostname): EC2AMAZ-IJOCM6M
+Sistema operativo: Windows 11
+Versión: 10.0
+Compilación (build): 26100
+Tamaño de página: 4096 bytes
+INFO DE MEMORIA DEL SISTEMA
+Tamaño de memoria: 7932.04 MB
+Memoria libre/disponible: 5707.82 MB
+Total de páginas: 2030603
+Page file total (aprox.): 1920.00 MB
+Page file libre (aprox.): 1920.00 MB
+Page file en uso (aprox.): 0.00 MB
+Fallos de página totales: ND
+Fallos mayores (lectura de disco): ND
+KB leídos desde disco (pgpgin): ND
+Páginas leídas desde swap (pswpin): ND
+Fallos de página del proceso: 1373
+
+INFORMACIÓN DEL VOLUMEN PRINCIPAL
+Volumen principal: C: (etiqueta: Windows)
+Dispositivo: \Device\HarddiskVolume3
+Sistema de archivos: NTFS
+Tamaño del volumen: 30203.00 MB
+INFORMACIÓN DE UNIDADES DE ALMACENAMIENTO
+Unidad   Tipo                   Tamaño (MB)
+C:\      Disco fijo             30203.00
+== Prueba de velocidad de lectura y escritura ==
+Escritura: 1.141 s (224.3 MiB/s)
+Lectura:   0.074 s (3462.7 MiB/s)
+
+CONSULTAS SISTEMA DE ARCHIVOS
+== Antes del hard link ==
+Archivo: archivo.txt
+  Tipo: archivo regular
+  Tamaño: 21 bytes
+  Atributos: [archivo] 
+  Índice de archivo: 1970324837068539
+  Enlaces: 1
+Creación:             2026-11-08 18:34:16
+Último acceso:        2026-11-08 18:34:16
+Última modificación: 2026-11-08 18:34:16
+
+== Después del hard link ==
+Archivo: archivo.txt
+  Tipo: archivo regular
+  Tamaño: 21 bytes
+  Atributos: [archivo] 
+  Índice de archivo: 1970324837068539
+  Enlaces: 2
+Creación:             2026-11-08 18:34:16
+Último acceso:        2026-11-08 18:34:16
+Última modificación: 2026-11-08 18:34:16
+
+Archivo: archivo_hardlink.txt
+  Tipo: archivo regular
+  Tamaño: 21 bytes
+  Atributos: [archivo] 
+  Índice de archivo: 1970324837068539
+  Enlaces: 2
+Creación:             2026-11-08 18:34:16
+Último acceso:        2026-11-08 18:34:16
+Última modificación: 2026-11-08 18:34:16
+
+== Después de modificar por 'archivo_hardlink.txt' ==
+Archivo: archivo.txt
+  Tipo: archivo regular
+  Tamaño: 59 bytes
+  Atributos: [archivo] 
+  Índice de archivo: 1970324837068539
+  Enlaces: 2
+Creación:             2026-11-08 18:34:16
+Último acceso:        2026-11-08 18:34:16
+Última modificación: 2026-11-08 18:34:16
+
+Archivo: archivo_hardlink.txt
+  Tipo: archivo regular
+  Tamaño: 59 bytes
+  Atributos: [archivo] 
+  Índice de archivo: 1970324837068539
+  Enlaces: 2
+Creación:             2026-11-08 18:34:16
+Último acceso:        2026-11-08 18:34:16
+Última modificación: 2026-11-08 18:34:16
+
+
+== Después de modificar por 'archivo.txt' ==
+Enlace simbólico: archivo_symlink.txt -> archivo.txt
+  Es enlace simbólico (reparse point): sí
+  Resuelve a: \\?\C:\Users\Administrator\Documents\SOInspector-DualSO\SOInspector-DualSO\windows\archivo.txt
+  Contenido leído por el enlace: 
+Después de borrar el original:
+  El enlace quedó roto (abrirlo falla)
+  El enlace como entrada sigue existiendo: sí
+
+INFORMACION DE LA UNIDAD
+Etiqueta: Windows
+Dispositivo: \Device\HarddiskVolume3
+Sistema de archivos: NTFS
+Numero de serie: 1C9E-0F09
+Longitud maxima de nombre: 255
+Bytes por sector: 512
+Sectores por clúster: 8
+Unidad de asignación (clúster): 4096 bytes
+Capacidad total: 30203.00 MB
+Espacio usado: 25884.39 MB (85.7%)
+Espacio libre: 4318.61 MB
