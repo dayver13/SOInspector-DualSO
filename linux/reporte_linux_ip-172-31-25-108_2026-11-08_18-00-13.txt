@@ -1,0 +1,98 @@
+Nombre del equipo (hostname): ip-172-31-25-108
+Sistema operativo: Ubuntu 26.04 LTS
+
+INFO MEMORIA DEL SISTEMA
+Tamaño de página: 4096 bytes
+Memoria total: 7775 MB
+Memoria libre: 6138 MB
+Memoria disponible: 7164 MB
+Número total de páginas: 1990499
+Swap total: 1024.00 MB
+Swap libre: 1024.00 MB
+Swap en uso: 0.00 MB
+
+Fallos de página totales: 4948057
+Fallos mayores (lectura de disco): 3499
+KB leídos desde disco (pgpgin): 974360
+Páginas leídas desde swap (pswpin): 0
+
+INFORMACIÓN DEL VOLUMEN PRINCIPAL
+Dispositivo principal: /dev/root
+Punto de montaje: /
+Sistema de archivos: ext4
+Tamaño del volumen: 6769.13 MB
+== Dispositivos de bloque ==
+Dispositivo    Tamaño (MB)  Tipo
+nvme0n1             8192.00  SSD/NVMe/virtual
+== Contadores de E/S (desde el arranque) ==
+Dispositivo          Lecturas     Escrituras
+nvme0n1                 36784          52976
+nvme0n1p1               35027          52619
+nvme0n1p13                323            355
+nvme0n1p14                134              0
+nvme0n1p15                353              2
+
+== Prueba de velocidad de lectura y escritura ==
+Escritura: 1.104 s (231.9 MiB/s)
+Lectura:   0.032 s (8013.7 MiB/s)
+
+CONSULTAS SISTEMA DE ARCHIVOS
+== Antes del hard link ==
+Archivo: archivo.txt
+Tipo: archivo regular
+Tamaño: 20 bytes
+Permisos: rw-rw-r-- (0664)
+Último acceso:        2026-11-08 18:00:14
+Última modificación: 2026-11-08 18:00:14
+Último cambio (inodo): 2026-11-08 18:00:14
+
+== Después del hard link ==
+Archivo: archivo.txt
+Tipo: archivo regular
+Tamaño: 20 bytes
+Permisos: rw-rw-r-- (0664)
+Último acceso:        2026-11-08 18:00:14
+Última modificación: 2026-11-08 18:00:14
+Último cambio (inodo): 2026-11-08 18:00:14
+
+Archivo: archivo_hardlink.txt
+Tipo: archivo regular
+Tamaño: 20 bytes
+Permisos: rw-rw-r-- (0664)
+Último acceso:        2026-11-08 18:00:14
+Última modificación: 2026-11-08 18:00:14
+Último cambio (inodo): 2026-11-08 18:00:14
+
+== Comparación de inodos ==
+  archivo.txt            inodo: 295870  dispositivo: 66305
+  archivo_hardlink.txt   inodo: 295870  dispositivo: 66305
+  Resultado: IGUALES, ambos nombres apuntan al mismo archivo
+
+== Después de borrar el original ==
+Archivo: archivo_hardlink.txt
+Tipo: archivo regular
+Tamaño: 20 bytes
+Permisos: rw-rw-r-- (0664)
+Último acceso:        2026-11-08 18:00:14
+Última modificación: 2026-11-08 18:00:14
+Último cambio (inodo): 2026-11-08 18:00:14
+
+Enlace simbólico: archivo_symlink.txt -> archivo.txt
+  Es enlace simbólico (lstat): sí
+  Inodo del enlace:  295891  tamaño: 11 bytes (largo de la ruta)
+  Inodo del destino: 295870  tamaño: 20 bytes
+  Enlaces del destino: 1
+  Contenido leído por el enlace: Contenido de prueba
+
+Después de borrar el original:
+  El enlace quedó roto (abrirlo falla: No such file or directory)
+  lstat sigue funcionando: sí, el enlace existe
+
+INFORMACIÓN DE LA UNIDAD
+Sistema de archivos: ext4
+Tamaño de bloque fundamental (f_frsize): 4096 bytes
+Tamaño de bloque preferido de E/S (f_bsize): 4096 bytes
+Longitud máxima de nombre: 255
+Capacidad total: 6769.13 MB
+Espacio usado: 4289.76 MB (63.5%)
+Espacio libre: 2463.37 MB
